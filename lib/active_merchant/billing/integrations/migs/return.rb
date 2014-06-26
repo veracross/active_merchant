@@ -26,6 +26,10 @@ module ActiveMerchant #:nodoc:
             params['vpc_TransactionNo']
           end
 
+          def authorization_code
+            params['vpc_AuthorizeId']
+          end
+
           def description
             params['vpc_OrderInfo'].gsub(/^.*\//, '')
           end
