@@ -25,6 +25,17 @@ class RemoteFirstdataE4Test < Test::Unit::TestCase
     assert_success response
   end
 
+  def test_successful_purchase_with_network_tokenization
+    @credit_card = network_tokenization_credit_card('4242424242424242',
+      payment_cryptogram: "BwABB4JRdgAAAAAAiFF2AAAAAAA=",
+      verification_value: nil
+    )
+    assert response = @gateway.purchase(@amount, @credit_card, @options)
+    assert_success response
+    assert_equal 'Transaction Normal - Approved', response.message
+    assert_false response.authorization.blank?
+  end
+
   def test_successful_purchase_with_specified_currency
     options_with_specified_currency = @options.merge({currency: 'GBP'})
     assert response = @gateway.purchase(@amount, @credit_card, options_with_specified_currency)
@@ -226,7 +237,16 @@ class RemoteFirstdataE4Test < Test::Unit::TestCase
     assert !gateway.verify_credentials
   end
 
-  def test_dump_transcript
-    # See firstdata_e4_test.rb for an example of a scrubbed transcript
+  def test_transcript_scrubbing
+    cc_with_different_cvc = credit_card(verification_value: '999')
+    transcript = capture_transcript(@gateway) do
+      @gateway.purchase(@amount, cc_with_different_cvc, @options)
+    end
+    transcript = @gateway.scrub(transcript)
+
+    assert_scrubbed(cc_with_different_cvc.number, transcript)
+    assert_scrubbed(cc_with_different_cvc.verification_value, transcript)
+    assert_scrubbed(@gateway.options[:password], transcript)
   end
+
 end

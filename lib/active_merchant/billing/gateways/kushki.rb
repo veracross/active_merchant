@@ -24,13 +24,22 @@ module ActiveMerchant #:nodoc:
         end
       end
 
+      def refund(amount, authorization, options={})
+        action = "refund"
+
+        post = {}
+        post[:ticketNumber] = authorization
+
+        commit(action, post)
+      end
+
       def void(authorization, options={})
         action = "void"
 
         post = {}
-        add_invoice(action, post, nil, options)
+        post[:ticketNumber] = authorization
 
-        commit(action, post, authorization)
+        commit(action, post)
       end
 
       def supports_scrubbing?
@@ -129,12 +138,13 @@ module ActiveMerchant #:nodoc:
       ENDPOINT = {
         "tokenize" => "tokens",
         "charge" => "charges",
-        "void" => "charges"
+        "void" => "charges",
+        "refund" => "refund"
       }
 
-      def commit(action, params, authorization=nil)
+      def commit(action, params)
         response = begin
-          parse(ssl_invoke(action, params, authorization))
+          parse(ssl_invoke(action, params))
         rescue ResponseError => e
           parse(e.response.body)
         end
@@ -151,11 +161,11 @@ module ActiveMerchant #:nodoc:
         )
       end
 
-      def ssl_invoke(action, params, authorization)
-        if action == "void"
-          ssl_request(:delete_with_body, url(action, authorization), post_data(params), headers(action))
+      def ssl_invoke(action, params)
+        if ["void", "refund"].include?(action)
+          ssl_request(:delete, url(action, params), nil, headers(action))
         else
-          ssl_post(url(action, authorization), post_data(params), headers(action))
+          ssl_post(url(action, params), post_data(params), headers(action))
         end
       end
 
@@ -171,11 +181,11 @@ module ActiveMerchant #:nodoc:
         params.to_json
       end
 
-      def url(action, authorization)
+      def url(action, params)
         base_url = test? ? test_url : live_url
 
-        if action == "void"
-          base_url + ENDPOINT[action] + "/" + authorization
+        if ["void", "refund"].include?(action)
+          base_url + ENDPOINT[action] + "/" + params[:ticketNumber].to_s
         else
           base_url + ENDPOINT[action]
         end
@@ -194,7 +204,7 @@ module ActiveMerchant #:nodoc:
       end
 
       def success_from(response)
-        return true if response["token"] || response["ticketNumber"]
+        return true if response["token"] || response["ticketNumber"] || response["code"] == "K000"
       end
 
       def message_from(succeeded, response)

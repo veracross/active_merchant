@@ -59,6 +59,7 @@ module ActiveMerchant #:nodoc:
         "COP" => '170',
         "CRC" => '188',
         "CZK" => '203',
+        "DKK" => '208',
         "DOP" => '214',
         "EUR" => '978',
         "GBP" => '826',
@@ -490,7 +491,7 @@ module ActiveMerchant #:nodoc:
 
       def encrypt(key, order_id)
         block_length = 8
-        cipher = OpenSSL::Cipher::Cipher.new('DES3')
+        cipher = OpenSSL::Cipher.new('DES3')
         cipher.encrypt
 
         cipher.key = Base64.strict_decode64(key)

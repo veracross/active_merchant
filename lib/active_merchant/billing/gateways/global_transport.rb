@@ -75,6 +75,17 @@ module ActiveMerchant #:nodoc:
         commit('CardVerify', post, options)
       end
 
+      def supports_scrubbing?
+        true
+      end
+
+      def scrub(transcript)
+        transcript.
+          gsub(%r((&?CardNum=)[^&]*)i, '\1[FILTERED]').
+          gsub(%r((&?CVNum=)[^&]*)i, '\1[FILTERED]').
+          gsub(%r((&?GlobalPassword=)[^&]*)i, '\1[FILTERED]')
+      end
+
       private
 
       def add_address(post, options)
@@ -109,6 +120,10 @@ module ActiveMerchant #:nodoc:
           response[node.name.downcase.to_sym] = node.text
         end
 
+        ext_data = Nokogiri::HTML.parse(response[:extdata])
+        response[:approved_amount] = ext_data.xpath("//approvedamount").text
+        response[:balance_due] = ext_data.xpath("//balancedue").text
+
         response
       end
 
@@ -140,7 +155,7 @@ module ActiveMerchant #:nodoc:
       end
 
       def success_from(response)
-        (response[:result] == "0")
+        response[:result] == "0" || response[:result] == "200"
       end
 
       def message_from(response)

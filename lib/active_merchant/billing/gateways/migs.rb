@@ -122,6 +122,13 @@ module ActiveMerchant #:nodoc:
         refund(money, authorization, options)
       end
 
+      def verify(credit_card, options={})
+        MultiResponse.run do |r|
+          r.process { authorize(100, credit_card, options) }
+          r.process(:ignore_result) { void(r.authorization, options) }
+        end
+      end
+
       # Checks the status of a previous transaction
       # This can be useful when a response is not received due to network issues
       #
@@ -200,6 +207,18 @@ module ActiveMerchant #:nodoc:
         @options[:login].start_with?('TEST')
       end
 
+      def supports_scrubbing?
+        true
+      end
+
+      def scrub(transcript)
+        transcript.
+          gsub(%r((&?CardNum=)\d*(&?)), '\1[FILTERED]\2').
+          gsub(%r((&?CardSecurityCode=)\d*(&?)), '\1[FILTERED]\2').
+          gsub(%r((&?AccessCode=)[^&]*(&?)), '\1[FILTERED]\2').
+          gsub(%r((&?Password=)[^&]*(&?)), '\1[FILTERED]\2')
+      end
+
       private
 
       def add_amount(post, money, options)
@@ -246,6 +265,7 @@ module ActiveMerchant #:nodoc:
       end
 
       def commit(post)
+        add_secure_hash(post) if @options[:secure_hash]
         data = ssl_post self.merchant_hosted_url, post_data(post)
         response_hash = parse(data)
         response_object(response_hash)
@@ -291,15 +311,16 @@ module ActiveMerchant #:nodoc:
 
       def add_secure_hash(post)
         post[:SecureHash] = calculate_secure_hash(post, @options[:secure_hash])
-        post[:SecureHashType] = HASH_ALGORITHM
+        post[:SecureHashType] = 'SHA256'
       end
 
       def calculate_secure_hash(post, secure_hash)
-        input = post.stringify_keys
-                    .select { |k| !%w(SecureHash SecureHashType).include?(k) }
-                    .sort
-                    .map { |(k, v)| "vpc_#{k}=#{v}" }.join('&')
-        OpenSSL::HMAC.hexdigest(HASH_ALGORITHM, [secure_hash].pack('H*'), input).upcase
+        input = post
+                .reject { |k| %i[SecureHash SecureHashType].include?(k) }
+                .sort
+                .map { |(k, v)| "vpc_#{k}=#{v}" }
+                .join('&')
+        OpenSSL::HMAC.hexdigest('SHA256', [secure_hash].pack('H*'), input).upcase
       end
     end
   end

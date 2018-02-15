@@ -59,6 +59,17 @@ module ActiveMerchant #:nodoc:
         commit('ccSettlement', money, options)
       end
 
+      def supports_scrubbing?
+        true
+      end
+
+      def scrub(transcript)
+        transcript.
+          gsub(%r((%3CstorePwd%3E).*(%3C(%3F|/)storePwd%3E))i, '\1[FILTERED]\2').
+          gsub(%r((%3CcardNum%3E)\d*(%3C(%3F|/)cardNum%3E))i, '\1[FILTERED]\2').
+          gsub(%r((%3Ccvd%3E)\d*(%3C(%3F|/)cvd%3E))i, '\1[FILTERED]\2')
+      end
+
       private
 
       def parse_card_or_auth(card_or_auth, options)
@@ -259,9 +270,11 @@ module ActiveMerchant #:nodoc:
           if brand = card_type(@credit_card.brand)
             xml.tag! 'cardType'     , brand
           end
-          if @credit_card.verification_value
+          if @credit_card.verification_value?
             xml.tag! 'cvdIndicator' , '1' # Value Provided
             xml.tag! 'cvd'          , @credit_card.verification_value
+          else
+            xml.tag! 'cvdIndicator' , '0'
           end
         end
       end

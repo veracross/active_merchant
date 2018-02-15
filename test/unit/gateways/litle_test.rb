@@ -21,6 +21,15 @@ class LitleTest < Test::Unit::TestCase
         number:  "44444444400009",
         payment_cryptogram: "BwABBJQ1AgAAAAAgJDUCAAAAAAA="
       })
+    @decrypted_android_pay = ActiveMerchant::Billing::NetworkTokenizationCreditCard.new(
+      {
+        source: :android_pay,
+        month: '01',
+        year: '2021',
+        brand: "visa",
+        number:  "4457000300000007",
+        payment_cryptogram: "BwABBJQ1AgAAAAAgJDUCAAAAAAA="
+      })
     @amount = 100
     @options = {}
   end
@@ -45,6 +54,21 @@ class LitleTest < Test::Unit::TestCase
     assert_equal "Insufficient Funds", response.message
     assert_equal "110", response.params["response"]
     assert response.test?
+  end
+
+  def test_passing_merchant_data
+    options = @options.merge(
+      affiliate: 'some-affiliate',
+      campaign: 'super-awesome-campaign',
+      merchant_grouping_id: 'brilliant-group'
+    )
+    stub_comms do
+      @gateway.purchase(@amount, @credit_card, options)
+    end.check_request do |endpoint, data, headers|
+      assert_match(%r(<affiliate>some-affiliate</affiliate>), data)
+      assert_match(%r(<campaign>super-awesome-campaign</campaign>), data)
+      assert_match(%r(<merchantGroupingId>brilliant-group</merchantGroupingId>), data)
+    end.respond_with(successful_purchase_response)
   end
 
   def test_passing_name_on_card
@@ -114,6 +138,13 @@ class LitleTest < Test::Unit::TestCase
     end.respond_with(successful_purchase_response)
   end
 
+  def test_add_android_pay_order_source
+    stub_comms do
+      @gateway.purchase(@amount, @decrypted_android_pay)
+    end.check_request do |endpoint, data, headers|
+      assert_match "<orderSource>androidpay</orderSource>", data
+    end.respond_with(successful_purchase_response)
+  end
 
   def test_successful_authorize_and_capture
     response = stub_comms do

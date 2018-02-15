@@ -20,7 +20,8 @@ module ActiveMerchant #:nodoc:
         :void => 'VOID',
         :abort => 'ABORT',
         :store => 'TOKEN',
-        :unstore => 'REMOVETOKEN'
+        :unstore => 'REMOVETOKEN',
+        :repeat => 'REPEAT'
       }
 
       CREDIT_CARDS = {
@@ -36,10 +37,17 @@ module ActiveMerchant #:nodoc:
         :jcb => "JCB"
       }
 
-      AVS_CVV_CODE = {
+      AVS_CODE = {
         "NOTPROVIDED" => nil,
         "NOTCHECKED" => 'X',
         "MATCHED" => 'Y',
+        "NOTMATCHED" => 'N'
+      }
+
+      CVV_CODE = {
+        "NOTPROVIDED" => 'S',
+        "NOTCHECKED" => 'X',
+        "MATCHED" => 'M',
         "NOTMATCHED" => 'N'
       }
 
@@ -87,7 +95,7 @@ module ActiveMerchant #:nodoc:
         add_customer_data(post, options)
         add_optional_data(post, options)
 
-        commit(:purchase, post)
+        commit((past_purchase_reference?(payment_method) ? :repeat : :purchase), post)
       end
 
       def authorize(money, payment_method, options = {})
@@ -130,7 +138,7 @@ module ActiveMerchant #:nodoc:
 
         post = {}
 
-        add_credit_reference(post, identification)
+        add_related_reference(post, identification)
         add_amount(post, money, options)
         add_invoice(post, options)
 
@@ -195,7 +203,7 @@ module ActiveMerchant #:nodoc:
         add_pair(post, :SecurityKey, security_key)
       end
 
-      def add_credit_reference(post, identification)
+      def add_related_reference(post, identification)
         order_id, transaction_id, authorization, security_key = identification.split(';')
 
         add_pair(post, :RelatedVendorTxCode, order_id)
@@ -267,10 +275,14 @@ module ActiveMerchant #:nodoc:
       end
 
       def add_payment_method(post, payment_method, options)
-        if payment_method.respond_to?(:number)
-          add_credit_card(post, payment_method)
+        if payment_method.is_a?(String)
+          if past_purchase_reference?(payment_method)
+            add_related_reference(post, payment_method)
+          else
+            add_token_details(post, payment_method, options)
+          end
         else
-          add_token_details(post, payment_method, options)
+          add_credit_card(post, payment_method)
         end
       end
 
@@ -343,10 +355,10 @@ module ActiveMerchant #:nodoc:
           :test => test?,
           :authorization => authorization_from(response, parameters, action),
           :avs_result => {
-            :street_match => AVS_CVV_CODE[ response["AddressResult"] ],
-            :postal_match => AVS_CVV_CODE[ response["PostCodeResult"] ],
+            :street_match => AVS_CODE[ response["AddressResult"] ],
+            :postal_match => AVS_CODE[ response["PostCodeResult"] ],
           },
-          :cvv_result => AVS_CVV_CODE[ response["CV2Result"] ]
+          :cvv_result => CVV_CODE[ response["CV2Result"] ]
         )
       end
 
@@ -356,9 +368,9 @@ module ActiveMerchant #:nodoc:
           response['Token']
         else
          [ params[:VendorTxCode],
-           response["VPSTxId"],
+           response["VPSTxId"] || params[:VPSTxId],
            response["TxAuthNo"],
-           response["SecurityKey"],
+           response["SecurityKey"] || params[:SecurityKey],
            action ].join(";")
         end
       end
@@ -419,6 +431,10 @@ module ActiveMerchant #:nodoc:
         post[key] = value if !value.blank? || options[:required]
       end
 
+      def past_purchase_reference?(payment_method)
+        return false unless payment_method.is_a?(String)
+        payment_method.split(';').last == 'purchase'
+      end
     end
 
   end
