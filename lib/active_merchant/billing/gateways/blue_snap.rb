@@ -167,6 +167,17 @@ module ActiveMerchant
         add_ach_info(doc, payment_method)
       end
 
+      def add_payer_info(doc, payment_method, options)
+        if payment_method.remote_account_id
+          add_vaulted_ach_info(doc, payment_method)
+        else
+          doc.send("payer-info") do
+            add_personal_info(doc, payment_method, options)
+          end
+          add_ach_info(doc, payment_method)
+        end
+      end
+      
       def add_card_holder_info(doc, payment_method, options)
         doc.send("card-holder-info") do
           add_personal_info(doc, payment_method, options)
@@ -213,7 +224,12 @@ module ActiveMerchant
           doc.send("routing-number", check.routing_number)
           add_account_type(doc, check)
         end
-        # TODO: Be sure to add form field for this and pull the value from it.
+        doc.send("authorized-by-shopper", "true")
+      end
+
+      def add_vaulted_ach_info(doc, check)
+        doc.send("ecp-transaction")
+        doc.send("vaulted-shopper-id", check.remote_account_id)
         doc.send("authorized-by-shopper", "true")
       end
 
