@@ -31,11 +31,15 @@ You can check out the latest source from git:
 
 Installation from RubyGems:
 
-    gem install activemerchant
+```console
+gem install activemerchant
+```
 
 Or, if you're using Bundler, just add the following to your Gemfile:
 
-    gem 'activemerchant'
+```ruby
+gem 'activemerchant'
+```
 
 ## Usage
 
@@ -91,7 +95,6 @@ The [ActiveMerchant Wiki](http://github.com/activemerchant/active_merchant/wikis
 * [Bank Frick](http://www.bankfrickacquiring.com/) - LI, US
 * [Banwire](http://www.banwire.com/) - MX
 * [Barclays ePDQ Extra Plus](http://www.barclaycard.co.uk/business/accepting-payments/epdq-ecomm/) - GB
-* [Barclays ePDQ MPI](http://www.barclaycard.co.uk/business/accepting-payments/epdq-mpi/) - GB
 * [Be2Bill](http://www.be2bill.com/) - FR
 * [Beanstream.com](http://www.beanstream.com/) - CA, US
 * [BluePay](http://www.bluepay.com/) - US
@@ -196,7 +199,7 @@ The [ActiveMerchant Wiki](http://github.com/activemerchant/active_merchant/wikis
 * [QuickBooks Merchant Services](http://payments.intuit.com/) - US
 * [QuickBooks Payments](http://payments.intuit.com/) - US
 * [Quantum Gateway](http://www.quantumgateway.com) - US
-* [QuickPay](http://quickpay.net/) - DE, DK, ES, FI, FR, FO, GB, IS, NO, SE
+* [QuickPay](http://quickpay.net/) - AT, BE, BG, CY, CZ, DE, DK, EE, ES, FI, FR, GB, GR, HR, HU, IE, IS, IT, LI, LT, LU, LV, MT, NL, NO, PL, PT, RO, SE SI, SK
 * [Qvalent](https://www.qvalent.com/) - AU
 * [Raven](http://www.deepcovelabs.com/raven) - AI, AN, AT, AU, BE, BG, BS, BZ, CA, CH, CR, CY, CZ, DE, DK, DM, DO, EE, EL, ES, FI, FR, GB, GG, GI, HK, HR, HU, IE, IL, IM, IN, IT, JE, KN, LI, LT, LU, LV, MH, MT, MY, NL, NO, NZ, PA, PE, PH, PL, PT, RO, RS, SC, SE, SG, SI, SK, UK, US, VG, ZA
 * [Realex](http://www.realexpayments.com/) - IE, GB, FR, BE, NL, LU, IT
@@ -233,3 +236,7 @@ The [ActiveMerchant Wiki](http://github.com/activemerchant/active_merchant/wikis
 ## API stability policy
 
 Functionality or APIs that are deprecated will be marked as such. Deprecated functionality is removed on major version changes - for example, deprecations from 2.x are removed in 3.x.
+
+## Ruby and Rails compatibility policies
+
+Because Active Merchant is a payment library, it needs to take security seriously. For this reason, Active Merchant guarantees compatibility only with actively supported versions of Ruby and Rails. At the time of this writing, that means that Ruby 2.3+ and Rails 4.2+ are supported.

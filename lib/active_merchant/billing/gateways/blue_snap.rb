@@ -2,8 +2,8 @@ require 'nokogiri'
 module ActiveMerchant
   module Billing
     class BlueSnapGateway < Gateway
-      self.test_url = "https://sandbox.bluesnap.com/services/2"
-      self.live_url = "https://ws.bluesnap.com/services/2"
+      self.test_url = 'https://sandbox.bluesnap.com/services/2'
+      self.live_url = 'https://ws.bluesnap.com/services/2'
       self.supported_countries = %w(US CA GB AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE)
 
       self.default_currency = 'USD'
@@ -93,7 +93,7 @@ module ActiveMerchant
       def refund(money, authorization, options = {})
         commit(:refund, :put, nil, authorization) do |doc|
           add_authorization(doc, authorization)
-          add_amount(doc, money)
+          add_amount(doc, money, options)
           add_order(doc, options)
         end
       end
@@ -113,8 +113,8 @@ module ActiveMerchant
       def store(credit_card, options = {})
         commit(:store) do |doc|
           add_personal_info(doc, credit_card, options)
-          doc.send("payment-sources") do
-            doc.send("credit-card-info") do
+          doc.send('payment-sources') do
+            doc.send('credit-card-info') do
               add_credit_card(doc, credit_card)
             end
           end
@@ -124,7 +124,7 @@ module ActiveMerchant
 
       def verify_credentials
         begin
-          ssl_get("#{url}/nonexistent", headers)
+          ssl_get(url.to_s, headers)
         rescue ResponseError => e
           return false if e.response.code.to_i == 401
         end
@@ -150,9 +150,9 @@ module ActiveMerchant
       private
 
       def add_auth_purchase(doc, money, payment_method, options)
-        doc.send("recurring-transaction", options[:recurring] ? "RECURRING" : "ECOMMERCE")
+        doc.send('recurring-transaction', options[:recurring] ? 'RECURRING' : 'ECOMMERCE')
         add_order(doc, options)
-        add_amount(doc, money)
+        add_amount(doc, money, options)
         add_fraud_info(doc, options)
 
         doc.send("vaulted-shopper-id", payment_method) if payment_method.is_a? String
@@ -180,7 +180,7 @@ module ActiveMerchant
         end
       end
 
-      def add_amount(doc, money)
+      def add_amount(doc, money, options)
         doc.amount(amount(money))
         doc.currency(options[:currency] || currency(money))
       end
@@ -236,18 +236,18 @@ module ActiveMerchant
       end
 
       def add_description(doc, description)
-        doc.send("transaction-meta-data") do
-          doc.send("meta-data") do
-            doc.send("meta-key", "description")
-            doc.send("meta-value", truncate(description, 50))
-            doc.send("meta-description", "Description")
+        doc.send('transaction-meta-data') do
+          doc.send('meta-data') do
+            doc.send('meta-key', 'description')
+            doc.send('meta-value', truncate(description, 500))
+            doc.send('meta-description', 'Description')
           end
         end
       end
 
       def add_order(doc, options)
-        doc.send("merchant-transaction-id", truncate(options[:order_id], 50)) if options[:order_id]
-        doc.send("soft-descriptor", options[:soft_descriptor]) if options[:soft_descriptor]
+        doc.send('merchant-transaction-id', truncate(options[:order_id], 50)) if options[:order_id]
+        doc.send('soft-descriptor', options[:soft_descriptor]) if options[:soft_descriptor]
         add_description(doc, options[:description]) if options[:description]
       end
 
@@ -262,13 +262,8 @@ module ActiveMerchant
         doc.zip(address[:zip]) if address[:zip]
       end
 
-      def add_invoice(post, money, options)
-        post[:amount] = amount(money)
-        post[:currency] = (options[:currency] || currency(money))
-      end
-
       def add_authorization(doc, authorization)
-        doc.send("transaction-id", authorization)
+        doc.send('transaction-id', authorization)
       end
 
       def add_transaction_type(doc, authorization)
@@ -277,6 +272,7 @@ module ActiveMerchant
 
       def parse(response)
         return bad_authentication_response if response.code.to_i == 401
+        return forbidden_response(response.body) if response.code.to_i == 403
 
         # Upon success a refund response comes back with code 204 and no content.
         return {code: response.code} if response.code.to_i == 204
@@ -284,7 +280,7 @@ module ActiveMerchant
         parsed = {}
         doc = Nokogiri::XML(response.body)
         doc.root.xpath('*').each do |node|
-          if (node.elements.empty?)
+          if node.elements.empty?
             parsed[node.name.downcase] = node.text
           else
             node.elements.each do |childnode|
@@ -293,7 +289,7 @@ module ActiveMerchant
           end
         end
 
-        parsed["content-location-header"] = response['content-location']
+        parsed['content-location-header'] = response['content-location']
         parsed
       end
 
@@ -347,7 +343,7 @@ module ActiveMerchant
       end
 
       def cvv_result(parsed)
-        CVVResult.new(CVC_CODE_TRANSLATOR[parsed["cvv-response-code"]])
+        CVVResult.new(CVC_CODE_TRANSLATOR[parsed['cvv-response-code']])
       end
 
       def avs_result(parsed)
@@ -359,30 +355,30 @@ module ActiveMerchant
       end
 
       def success_from(action, response)
-        (200...300).include?(response.code.to_i)
+        (200...300).cover?(response.code.to_i)
       end
 
       def message_from(succeeded, parsed_response)
-        return "Success" if succeeded
-        parsed_response["description"]
+        return 'Success' if succeeded
+        parsed_response['description']
       end
 
       def authorization_from(action, parsed_response)
-        (action == :store) ? vaulted_shopper_id(parsed_response) : parsed_response["transaction-id"]
+        action == :store ? vaulted_shopper_id(parsed_response) : parsed_response['transaction-id']
       end
 
       def vaulted_shopper_id(parsed_response)
-        return nil unless parsed_response["content-location-header"]
-        parsed_response["content-location-header"].split("/").last
+        return nil unless parsed_response['content-location-header']
+        parsed_response['content-location-header'].split('/').last
       end
 
       def error_code_from(parsed_response)
-        parsed_response["code"]
+        parsed_response['code']
       end
 
       def root_attributes
         {
-          xmlns: "http://ws.plimus.com"
+          xmlns: 'http://ws.plimus.com'
         }
       end
 
@@ -424,7 +420,11 @@ module ActiveMerchant
       end
 
       def bad_authentication_response
-        {"description" => "Unable to authenticate.  Please check your credentials."}
+        { 'description' => 'Unable to authenticate.  Please check your credentials.' }
+      end
+
+      def forbidden_response(body)
+        { 'description' => body }
       end
     end
   end

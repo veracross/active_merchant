@@ -20,7 +20,7 @@ module ActiveMerchant #:nodoc:
       # MiGS is supported throughout Asia Pacific, Middle East and Africa
       # MiGS is used in Australia (AU) by ANZ (eGate), CBA (CommWeb) and more
       # Source of Country List: http://www.scribd.com/doc/17811923
-      self.supported_countries = %w(AU AE BD BN EG HK ID IN JO KW LB LK MU MV MY NZ OM PH QA SA SG TT VN)
+      self.supported_countries = %w(AU AE BD BN EG HK ID JO KW LB LK MU MV MY NZ OM PH QA SA SG TT VN)
 
       # The card types supported by the payment gateway
       self.supported_cardtypes = [:visa, :master, :american_express, :diners_club, :jcb]
@@ -122,6 +122,13 @@ module ActiveMerchant #:nodoc:
         refund(money, authorization, options)
       end
 
+      def verify(credit_card, options={})
+        MultiResponse.run do |r|
+          r.process { authorize(100, credit_card, options) }
+          r.process(:ignore_result) { void(r.authorization, options) }
+        end
+      end
+
       # Checks the status of a previous transaction
       # This can be useful when a response is not received due to network issues
       #
@@ -165,10 +172,8 @@ module ActiveMerchant #:nodoc:
         add_invoice(post, options)
         add_creditcard_type(post, options[:card_type]) if options[:card_type]
 
-        post.merge!(
-          :Locale => options[:locale] || 'en',
-          :ReturnURL => options[:return_url]
-        )
+        post[:Locale] = options[:locale] || 'en'
+        post[:ReturnURL] = options[:return_url]
 
         add_standard_parameters('pay', post, options[:unique_id])
 
@@ -190,7 +195,7 @@ module ActiveMerchant #:nodoc:
 
         expected_secure_hash = calculate_secure_hash(response_hash, @options[:secure_hash])
         unless response_hash[:SecureHash] == expected_secure_hash
-          raise SecurityError, "Secure Hash mismatch, response may be tampered with"
+          raise SecurityError, 'Secure Hash mismatch, response may be tampered with'
         end
 
         response_object(response_hash)
@@ -198,6 +203,20 @@ module ActiveMerchant #:nodoc:
 
       def test?
         @options[:login].start_with?('TEST')
+      end
+
+      def supports_scrubbing?
+        true
+      end
+
+      def scrub(transcript)
+        transcript.
+          gsub(%r((&?CardNum=)\d*(&?)), '\1[FILTERED]\2').
+          gsub(%r((&?CardSecurityCode=)\d*(&?)), '\1[FILTERED]\2').
+          gsub(%r((&?AccessCode=)[^&]*(&?)), '\1[FILTERED]\2').
+          gsub(%r((&?Password=)[^&]*(&?)), '\1[FILTERED]\2').
+          gsub(%r((&?3DSXID=)[^&]*(&?)), '\1[FILTERED]\2').
+          gsub(%r((&?VerToken=)[^&]*(&?)), '\1[FILTERED]\2')
       end
 
       private
@@ -219,10 +238,10 @@ module ActiveMerchant #:nodoc:
       def add_3ds(post, options)
         post[:VerType] = options[:ver_type] if options[:ver_type]
         post[:VerToken] = options[:ver_token] if options[:ver_token]
-        post["3DSXID"] = options[:three_ds_xid] if options[:three_ds_xid]
-        post["3DSECI"] = options[:three_ds_eci] if options[:three_ds_eci]
-        post["3DSenrolled"] = options[:three_ds_enrolled] if options[:three_ds_enrolled]
-        post["3DSstatus"] = options[:three_ds_status] if options[:three_ds_status]
+        post['3DSXID'] = options[:three_ds_xid] if options[:three_ds_xid]
+        post['3DSECI'] = options[:three_ds_eci] if options[:three_ds_eci]
+        post['3DSenrolled'] = options[:three_ds_enrolled] if options[:three_ds_enrolled]
+        post['3DSstatus'] = options[:three_ds_status] if options[:three_ds_status]
       end
 
       def add_creditcard(post, creditcard)
@@ -233,7 +252,7 @@ module ActiveMerchant #:nodoc:
 
       def add_creditcard_type(post, card_type)
         post[:Gateway]  = 'ssl'
-        post[:card] = CARD_TYPES.detect{|ct| ct.am_code == card_type}.migs_long_code
+        post[:card] = CARD_TYPES.detect { |ct| ct.am_code == card_type }.migs_long_code
       end
 
       def parse(body)
@@ -246,6 +265,7 @@ module ActiveMerchant #:nodoc:
       end
 
       def commit(post)
+        add_secure_hash(post) if @options[:secure_hash]
         data = ssl_post self.merchant_hosted_url, post_data(post)
         response_hash = parse(data)
         response_object(response_hash)
@@ -253,10 +273,10 @@ module ActiveMerchant #:nodoc:
 
       def response_object(response)
         avs_response_code = response[:AVSResultCode]
-        avs_response_code = 'S' if avs_response_code == "Unsupported"
+        avs_response_code = 'S' if avs_response_code == 'Unsupported'
 
         cvv_result_code = response[:CSCResultCode]
-        cvv_result_code = 'P' if cvv_result_code == "Unsupported"
+        cvv_result_code = 'P' if cvv_result_code == 'Unsupported'
 
         Response.new(success?(response), response[:Message], response,
           :test => test?,
@@ -286,7 +306,7 @@ module ActiveMerchant #:nodoc:
       end
 
       def post_data(post)
-        post.collect { |key, value| "vpc_#{key}=#{CGI.escape(value.to_s)}" }.join("&")
+        post.collect { |key, value| "vpc_#{key}=#{CGI.escape(value.to_s)}" }.join('&')
       end
 
       def add_secure_hash(post)
